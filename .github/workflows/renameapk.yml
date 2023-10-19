@@ -3,7 +3,6 @@ name: Download and update APK
 on:
   schedule:
     - cron: '0 */1 * * *'
-  workflow_dispatch:  
 
 jobs:
   build:
@@ -17,9 +16,9 @@ jobs:
       run: |
         curl -LJO "https://raw.githubusercontent.com/FongMi/Release/main/apk/dev/leanback-python-armeabi_v7a.apk"
     
-    - name: Download json
+    - name: Download releasejson
       run: |
-        curl -O https://raw.githubusercontent.com/FongMi/Release/main/apk/dev/leanback.json
+        curl -A "okhttp/4.11.0" https://raw.githubusercontent.com/FongMi/Release/main/apk/dev/leanback.json -o leanback.json
 
     - name: Check if APK has changed
       id: apkchange
@@ -33,6 +32,16 @@ jobs:
       with:
         distribution: 'adopt'
         java-version: '11'
+        
+    - name: Install apktool
+      run: |
+        wget https://raw.githubusercontent.com/iBotPeaches/Apktool/master/scripts/linux/apktool
+        wget https://bitbucket.org/iBotPeaches/apktool/downloads/apktool_2.4.1.jar
+        mv apktool_2.4.1.jar apktool.jar
+        sudo mv apktool /usr/local/bin/
+        sudo mv apktool.jar /usr/local/bin/
+        sudo chmod +x /usr/local/bin/apktool
+        sudo chmod +x /usr/local/bin/apktool.jar
 
     - name: Save keystore file
       run: echo "${{ secrets.KEYSTORE }}" | base64 --decode > my-release-key.jks
@@ -56,7 +65,7 @@ jobs:
         jarsigner -verify -verbose -certs new.apk
 
     - name: Commit and push if it's not a fork
-      if: github.event_name == 'schedule' && github.repository == github.event.repository.full_name
+      if: github.repository == github.event.repository.full_name
       run: |
         git config --local user.email "action@github.com"
         git config --local user.name "GitHub Action"
