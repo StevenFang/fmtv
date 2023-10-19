@@ -56,6 +56,7 @@ jobs:
         # Change the package name
         sed -i.bak 's/package="com.fongmi.android.tv"/package="com.tvnp"/' outputFolder/AndroidManifest.xml
         sed -i 's/@android:color\/Teal_800/#FF018786/g' outputFolder/res/values-v31/colors.xml
+        sed -i 's/@android:color\/Teal_700/#FF00796B/g' outputFolder/res/values-v31/colors.xml
       
         # Rebuild the apk
         apktool b outputFolder -o new.apk
