@@ -1,0 +1,59 @@
+name: Download and update APK
+
+on:
+  schedule:
+    - cron: '0 */12 * * *'
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Checkout
+      uses: actions/checkout@v2
+    
+    - name: Download APK
+      run: |
+        curl -LJO "https://raw.githubusercontent.com/FongMi/Release/main/apk/dev/leanback-python-armeabi_v7a.apk"
+
+    - name: Check if APK has changed
+      id: apkchange
+      run: |
+        apk_sum=$(md5sum leanback-python-armeabi_v7a.apk | awk '{ print $1 }')
+        echo "::set-output name=apk_sum::$apk_sum"
+        git diff --quiet HEAD~1 || echo "::set-output name=changed::yes"
+
+    - name: Setup Java
+      uses: actions/setup-java@v2
+      with:
+        distribution: 'adopt'
+        java-version: '11'
+
+    - name: Save keystore file
+      run: echo "${{ secrets.KEYSTORE }}" | base64 --decode > my-release-key.jks
+
+    - name: Update APK package name and signature
+      if: steps.apkchange.outputs.changed == 'yes'
+      run: |
+        # Decode the apk
+        apktool d leanback-python-armeabi_v7a.apk -o outputFolder
+
+        # Change the package name
+        sed -i.bak 's/package="com.fongmi.android.tv"/package="com.tvnp"/' outputFolder/AndroidManifest.xml
+      
+        # Rebuild the apk
+        apktool b outputFolder -o new.apk
+
+        # Sign the apk
+        jarsigner -verbose -sigalg SHA1withRSA -digestalg SHA1 -keystore my-release-key.jks -storepass "${{ secrets.KEYSTORE_PASSWORD }}" -keypass "${{ secrets.KEY_PASSWORD }}" new.apk "${{ secrets.ALIAS_NAME }}"
+
+        # Verify the signature
+        jarsigner -verify -verbose -certs new.apk
+
+    - name: Commit and push if it's not a fork
+      if: github.event_name == 'schedule' && github.repository == github.event.repository.full_name
+      run: |
+        git config --local user.email "action@github.com"
+        git config --local user.name "GitHub Action"
+        git add new.apk
+        git diff --quiet && git diff --staged --quiet || (echo 'Committing changes...' && git commit -m 'Update APK' && git push)
